@@ -1,0 +1,342 @@
+---
+title: "Compte-Rendu"
+author: "Thomas Laurent"
+date: "2"
+header-includes:
+- \usepackage[T1]{fontenc}
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,echo=FALSE,results=FALSE,message=FALSE}
+#Chargement des packages
+library(dplyr)
+library(magrittr)
+library(stats)
+library(doBy)
+library(car)
+library(ggplot2)
+library(gridExtra)
+#Import des donnees exemple A
+exempleA=read.csv(file="exempleA.csv",header=TRUE,sep="\t")
+```
+
+#MANOVA a un facteur
+```{r}
+#Data Handling
+attach(exempleA)
+Y=cbind(y1,y2,y3)
+f=as.factor(f)
+#Analyse descriptive
+summary(Y)
+tapply(y1,f,mean)
+tapply(y2,f,mean)
+tapply(y3,f,mean)
+table(f)
+
+par(mfrow=c(1,3))
+boxplot(y1~f, xlab="Facteur f", ylab="Variable r?ponse y1")
+boxplot(y2~f,xlab="Facteur f", ylab="Variable r?ponse y2")
+boxplot(y3~f,xlab="Facteur f", ylab="Variable r?ponse y3")
+layout(1)
+
+library(Hmisc)
+rcorr(Y)
+```
+
+##Tests unidimensionnels
+```{r}
+#MANOVA a un facteur
+fitm=manova(Y~f)
+summary.aov(fitm) 
+
+summary(lm(Y~f))
+```
+
+##Tests multidimensionnels
+
+```{r}
+summary(fitm) 
+summary(fitm,test="Wilks") 
+summary(fitm,test="Hotelling-Lawley") 
+summary(fitm,test="Roy") 
+summary(fitm,test="Pillai")
+```
+
+##Estimation des parametres type SAS
+
+```{r}
+options(contrasts=c("contr.SAS","contr.SAS"))
+fit.lm=lm(Y~f)
+summary(fit.lm)
+#Calcul des residus
+residus=Y-predict(fit.lm)
+print(residus)
+```
+
+##Matrices E et H
+
+```{r}
+# mais pas sp?cialement utiles pour l'interpr?tation
+p=nlevels(f)
+p
+n=length(y1)
+n
+E = (n-1)*cov(fitm$residuals)
+S = E/(n-p)
+S
+H = (n-1)*cov(fitm$fitted.values)
+H
+# pour obtenir les valeurs propres de E-1.H
+eigen(solve(E) %*% H)
+detach(exempleA)
+```
+
+#MANOVA a deux facteurs croises 
+
+```{r,echo=FALSE,message=FALSE}
+
+exempleB=read.csv("exempleB.csv",header=TRUE,sep="\t")
+attach(exempleB)
+Y=cbind(y1,y2,y3)
+f1=as.factor(f1)
+f2=as.factor(f2)
+
+```
+
+##Analyse descriptive
+
+```{r}
+summary(Y)
+tapply(y1,f1,mean)
+tapply(y2,f1,mean)
+tapply(y3,f1,mean)
+tapply(y1,f2,mean)
+tapply(y2,f2,mean)
+tapply(y3,f2,mean)
+tapply(y1,list(f1,f2),mean)
+tapply(y2,list(f1,f2),mean)
+tapply(y3,list(f1,f2),mean)
+table(f1)
+table(f2)
+table(f1,f2)
+
+#Correlations
+library(Hmisc)
+rcorr(Y)
+```
+
+##Modele avec interactions
+
+```{r}
+fit.int=manova(Y~f1*f2)
+summary.aov(fit.int)
+summary(fit.int,test="Wilks") 
+summary(fit.int,test="Hotelling-Lawley") 
+summary(fit.int,test="Pillai")
+summary(fit.int,test="Roy") 
+
+#Estimations
+options(contrasts=c("contr.SAS","contr.SAS"))
+fit.lm.int=lm(Y~f1*f2)
+summary(fit.lm.int)
+
+#Tests multidimensionnels
+p=nlevels(f1)*nlevels(f2)
+p
+n=length(y1)
+n
+E = (n-1)*cov(fit.int$residuals)
+E
+S = E/(n-p)
+S
+H = (n-1)*cov(fit.int$fitted.values)
+H
+
+library(Hmisc)
+rcorr(fit.int$residuals)
+```
+
+#MANOVA modele additif
+
+```{r}
+fit.add=manova(Y~f1+f2)
+summary.aov(fit.add)
+summary(fit.add,test="Wilks") 
+summary(fit.add,test="Hotelling-Lawley") 
+summary(fit.add,test="Pillai")
+summary(fit.add,test="Roy") 
+
+
+options(contrasts=c("contr.SAS","contr.SAS"))
+fit.lm.add=lm(Y~f1+f2)
+summary(fit.lm.add)
+
+p=nlevels(f1)+nlevels(f2)-1
+p
+n=length(y1)
+n
+E = (n-1)*cov(fit.add$residuals)
+S = E/(n-p)
+S
+H = (n-1)*cov(fit.add$fitted.values)
+H
+rcorr(fit.add$residuals)
+
+```
+
+#Jeu de donnees "Plantes"
+
+##Import des données et analyse descriptive
+
+```{r}
+plantes=read.csv("plantes.csv",header=TRUE,sep="\t")
+#Transformation des facteurs en classe factor
+plantes=plantes%>%mutate(trt=as.factor(trt),temp=as.factor(temp))
+
+#Distribution des variables reponses avant transformation
+p1=ggplot(data=plantes,aes(y1)) + geom_histogram() +ggtitle("y1") + theme_bw()
+p2=ggplot(data=plantes,aes(y2)) + geom_histogram() +ggtitle("y2") + theme_bw()
+p3=ggplot(data=plantes,aes(y3)) + geom_histogram() +ggtitle("y3") + theme_bw()
+grid.arrange(p1,p2,p3,ncol=3)
+
+```
+
+On observe que la distribution sont asymétriques à gauche. Il est préférable de procéder à une transformation au logarithme pour obtenir une distribution proche d'une v.a de loi normale.
+
+```{r}
+#Transformation log
+plantes_log=plantes%>%mutate_each(funs(log10), which(sapply(., is.numeric)))
+
+#Distribution des variables reponses apres transformation
+p1=ggplot(data=plantes_log,aes(y1)) + geom_histogram() +ggtitle("y1") + theme_bw()
+p2=ggplot(data=plantes_log,aes(y2)) + geom_histogram() +ggtitle("y2") + theme_bw()
+p3=ggplot(data=plantes_log,aes(y3)) + geom_histogram() +ggtitle("y3") + theme_bw()
+grid.arrange(p1,p2,p3,ncol=3)
+
+s1=plantes_log%>%select(which(sapply(., is.numeric)))%>%summarize_each(funs(mean))
+s2=plantes_log%>%select(which(sapply(., is.numeric)))%>%summarize_each(funs(min))
+s3=plantes_log%>%select(which(sapply(., is.numeric)))%>%summarize_each(funs(max))
+s4=plantes_log%>%select(which(sapply(., is.numeric)))%>%summarize_each(funs(median))
+summary=rbind(s1,s2,s3,s4)
+summary=summary%>%mutate_each(funs(round(.,digits=2)))
+summary=summary%>%tibble::rownames_to_column()
+summary$rowname=c("moyenne","minimum","maximum","mediane")
+print(summary)
+
+#Statistique descriptive en fonction du facteur 1
+desc=summaryBy(y1~trt,data=plantes_log,FUN=function(x) { c(moyenne = mean(x), sd = sd(x)) } )
+print(desc)
+desc=summaryBy(y2~trt,data=plantes_log,FUN=function(x) { c(moyenne = mean(x), sd = sd(x)) } )
+print(desc)
+desc=summaryBy(y3~trt,data=plantes_log,FUN=function(x) { c(moyenne = mean(x), sd = sd(x)) } )
+print(desc)
+
+#Statistique descriptive en fonction du facteur 2
+desc=summaryBy(y1~temp,data=plantes_log,FUN=function(x) { c(moyenne = mean(x), sd = sd(x)) } )
+print(desc)
+desc=summaryBy(y2~temp,data=plantes_log,FUN=function(x) { c(moyenne = mean(x), sd = sd(x)) } )
+print(desc)
+desc=summaryBy(y3~temp,data=plantes_log,FUN=function(x) { c(moyenne = mean(x), sd = sd(x)) } )
+print(desc)
+```
+
+Augmentation des variables reponses quand la temperature si on passe de 14 a 18 degres. Peu de difference entre 18 et 22 degres. En revanche, diminution pour les temperatures plus elevees (niveau 4).
+
+```{r}
+#Statistiques descriptives pour les facteurs croises
+desc=summaryBy(y1~temp+trt,data=plantes_log,FUN=function(x) { c(moyenne = mean(x), sd = sd(x)) } )
+print(desc)
+desc=summaryBy(y2~temp+trt,data=plantes_log,FUN=function(x) { c(moyenne = mean(x), sd = sd(x)) } )
+print(desc)
+desc=summaryBy(y3~temp+trt,data=plantes_log,FUN=function(x) { c(moyenne = mean(x), sd = sd(x)) } )
+print(desc)
+```
+
+Pour les trois variables reponses, on observe que les moyennes pour les plantes traitees sont inferieures a celles controlees pour les temperatures au-dela de 14 degres.
+
+```{r}
+#Resume du plan d'experience
+print(plantes_log%>%select(trt,temp)%>%table)
+```
+
+On est dans le cadre d'un plan equilibre repete. On peut donc introduire les interactions dans le modele.
+
+On regarde les correlations entre les variables reponse.
+
+```{r}
+plantes_log%>%select((which(sapply(.,is.numeric))))%>%as.matrix%>%rcorr
+```
+
+On remarque que les variables sont assex fortement correlees entre elles.
+
+```{r}
+#Modele MANOVA
+attach(plantes_log)
+Y=cbind(y1,y2,y3)
+fit.int=manova(Y~temp*trt)
+summary.aov(fit.int)
+summary(fit.int,test="Wilks") 
+summary(fit.int,test="Hotelling-Lawley") 
+summary(fit.int,test="Pillai")
+summary(fit.int,test="Roy") 
+```
+
+On observe que les test pour chaque modele unidimensionne, les interactions ne sont pas significatives. La somme des carres des residus est elevee pour les variables reponses 1 et 2. Les tests multidimensionnels sont en accord avec les resultats obtenus avec les tests unidimensionnels (rejet au-dela de 20% sauf pour le test de Roy).
+
+##Modele additif
+
+```{r}
+fit.add=manova(Y~temp+trt)
+summary.aov(fit.add)
+summary(fit.add,test="Wilks") 
+summary(fit.add,test="Hotelling-Lawley") 
+summary(fit.add,test="Pillai")
+summary(fit.add,test="Roy") 
+```
+
+Les tests unidimensionnels et multidimensionnels sont significatifs a 5% et on retient les deux facteurs dans le modele final.
+
+##Estimation des parametres du modele additif
+
+```{r}
+#Estimation des parametres
+options(contrasts=c("contr.SAS","contr.SAS"))
+fit.lm.add=lm(Y~temp+trt)
+summary(fit.lm.add)
+#Coefficient
+print(fit.lm.add$coefficients)
+```
+
+Pour les variable reponses 1 et 3, les coefficients R2 sont eleves compare a la variable reponse 2 pour laquelle le R2 n'atteint que 53%. On en deduit que le modele n'explique pas suffisamment les variations de la variable reponse 2 (longueur de la racine la plus longue).
+
+```{r}
+#Diagramme d'interactions
+op=par(mfrow=c(2,2),mar=c(1.2,1.2,1.2,1.2)+3,cex=0.6)
+interaction.plot(temp,trt,y1,xlab = "Temperature",ylab="Traitement")
+title("Interactions y1")
+interaction.plot(temp,trt,y2,xlab = "Temperature",ylab="Traitement")
+title("Interactions y2")
+interaction.plot(temp,trt,y3,xlab = "Temperature",ylab="Traitement")
+title("Interactions y3")
+par(op)
+
+#Maximum des variables reponses
+print(10^(fit.lm.add$coefficients[1,]+fit.lm.add$coefficients[3,]))
+```
+
+Pour l'augmentation de poids des racines, la longueur de la racine la plus longue et l'augmentation de la partie hors de terre, on observe qu'il y a une augmentation (>0.5 log, >0.1 log et >0.8 log, respectivement pour les variables reponses 1,2 et 3) si la temperature passe de 14 a 18 degres pour un meme traitement. Le diagramme d'interaction permet de souligner qu'il n'y a pas d'interactions entre les deux facteurs. Les estimations et les diagrammes suggerent que en moyenne, la croissance de la plante est maximale a 18 degres sans traitement (avec des reponses moyennes egales a 8.64, 32.68 et 14.27, respectivement). Le traitement a effet negatif sur la croissance avec un effet moyen plus important pour l'augmentation du poids de racine.
+
+##Validation
+
+```{r}
+#Hypothese de normalite
+shapiro.test(fit.lm.add$residuals)
+
+```
+ L'hypothese de normalite des residus est verifiee.
+ 
+ 
